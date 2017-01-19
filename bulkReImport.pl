@@ -17,7 +17,7 @@ chomp $program;
 my $version = "v2.00.00";
 
 ## CHANGE QUEUE
-# rewritten for BigIQ 5.0
+# rewritten for BigIQ 5.x
 
 ## DESCRIPTION
 # This script reads a CSV file containing a list of BIG-IPs and then:
@@ -286,29 +286,35 @@ for $bigip (@bigips) {
 
     my $deviceStart = gettimeofday();
     $timestamp = getTimeStamp();
-    &printAndLog(STDOUT, 1, "\n$mip Started:  $timestamp\n");
-
     my $deviceCmd = "curl -s -k -u $bigiqCreds -H \"$contType\" -X GET https://localhost/mgmt/shared/resolver/device-groups/cm-bigip-allBigIpDevices/devices";
 
     my $devices = &callCurl ($deviceCmd, "Get all devices discovered for BIGIQ $mip", $opt_v);
     my $done = 0;
-    my $successStatus = 0;   
-    while (not $done) {
-       if ($devices->{"items"}[$i]->{"product"} eq "BIG-IP") {
-           my $machineId = $devices->{"items"}[$i]->{machineId};
+    my $successStatus = 0;  
 
-           if (discoverModules($mip, $machineId)) {
-       	      if (importModules($mip, $machineId)) {
-                  $successStatus = 1;
-              }
-           }
-       } else {
-          print "Ignore BIG-IQ if in device list.\n"
-       };
-       $done = 1;
-       $i++;		
+    while (not $done) {
+        if ($mip eq $devices->{"items"}[$i]->{"address"}) {
+	    &printAndLog(STDOUT, 1, "Found device BIG-IP - $mip: $timestamp\n");
+	    if ($devices->{"items"}[$i]->{"product"} eq "BIG-IP") {
+		my $machineId = $devices->{"items"}[$i]->{machineId};
+
+		if (discoverModules($mip, $machineId)) {
+		    if (importModules($mip, $machineId)) {
+			$successStatus = 1;
+		    }
+		}
+	    } else {
+		print "Ignore BIG-IQ if in device list.\n"
+	    };
+	    $done = 1;
+	    $i++;		
+	} else {
+	    &printAndLog(STDOUT, 1, "Continue to look for device BIG-IP - $mip: $timestamp\n");
+	    $i++;
+	    sleep 2;
+	}
     }
-    
+
     # We need discovery, and all imports to be successful before we increment the success count
     if ($successStatus eq 1)
     {
